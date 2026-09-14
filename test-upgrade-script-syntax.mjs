@@ -12,6 +12,10 @@ import { createRequire } from 'node:module'
 
 const ROOT = dirname(fileURLToPath(import.meta.url))
 const SRC = readFileSync(join(ROOT, 'lib', 'index.js'), 'utf8')
+// relaunchPrelude 已在 Step 6 搬进 framework.js（生成器函数里的局部 ps/launchSnippet 仍在 index.js）
+const SRC_FW = readFileSync(join(ROOT, 'lib', 'server', 'domain', 'framework.js'), 'utf8')
+const SRC_RFU = readFileSync(join(ROOT, 'lib', 'server', 'routes', 'framework-upgrade.js'), 'utf8')
+const SRC_FR = readFileSync(join(ROOT, 'lib', 'server', 'routes', 'framework.js'), 'utf8')
 const OUT = join(ROOT, '.testdir')
 mkdirSync(OUT, { recursive: true })
 
@@ -38,11 +42,14 @@ function extractBlocks() {
   const endMarker = ".filter((l) => l !== '').join('\\r\\n')"
   const startMarker = 'const lines = ['
   const out = []
-  let at = SRC.indexOf(endMarker)
-  while (at !== -1) {
-    const from = SRC.lastIndexOf(startMarker, at)
-    if (from !== -1) out.push(SRC.slice(from + startMarker.length - 1, at) + endMarker)
-    at = SRC.indexOf(endMarker, at + endMarker.length)
+  // 路由拆分（Step 8b）后脚本生成块搬进了 routes/framework-upgrade.js（升级）与 routes/framework.js（回滚/重启）；三处都扫
+  for (const source of [SRC_RFU, SRC_FR, SRC]) {
+    let at = source.indexOf(endMarker)
+    while (at !== -1) {
+      const from = source.lastIndexOf(startMarker, at)
+      if (from !== -1) out.push(source.slice(from + startMarker.length - 1, at) + endMarker)
+      at = source.indexOf(endMarker, at + endMarker.length)
+    }
   }
   return out
 }
@@ -50,23 +57,23 @@ function extractBlocks() {
 /** 抽出真实的 ps() 实现（要测的就是它的转义正确性，不能另写一份）。
  *  结束边界取「下一个 const 声明」——ps() 与 lines 之间现在还有 launchSnippet/patchFilePath，
  *  直接切到 `const lines` 会把它们一起吞进来（里面含 import.meta，破坏 new Function 求值）。 */
-const psStart = SRC.indexOf('const ps = (s) => {')
+const psStart = SRC_RFU.indexOf('const ps = (s) => {')
 const psEndCandidates = ['const launchSnippet', 'const patchFilePath', 'const lines = [']
-  .map((marker) => SRC.indexOf(marker, psStart))
+  .map((marker) => SRC_RFU.indexOf(marker, psStart))
   .filter((at) => at > psStart)
-const psImpl = SRC.slice(psStart, Math.min(...psEndCandidates)).replace(/\s+$/u, '')
+const psImpl = SRC_RFU.slice(psStart, Math.min(...psEndCandidates)).replace(/\s+$/u, '')
 
 /** 抽出真实 launchSnippet 实现（单行箭头函数），让语法校验覆盖真实片段文本。 */
-const lsStart = SRC.indexOf('const launchSnippet = (tag) =>')
-const launchSnippetSrc = SRC.slice(lsStart, SRC.indexOf('\n', lsStart)).replace(/;\s*$/u, '')
+const lsStart = SRC_RFU.indexOf('const launchSnippet = (tag) =>')
+const launchSnippetSrc = SRC_RFU.slice(lsStart, SRC_RFU.indexOf('\n', lsStart)).replace(/;\s*$/u, '')
 
 /** 抽出真实的 relaunchPrelude 生成器（v0.3.37：拉起逻辑只此一份，必须测真的）。
  *  结束边界用「函数体最后一行的 `].join('\r\n')` + 其后第一个 }」定位——
  *  直接匹配 `\n}` 会被 CRLF 检出害死（仓库文件是 CRLF）。 */
-const rpStart = SRC.indexOf('function relaunchPrelude(')
-const rpTail = rpStart === -1 ? -1 : SRC.indexOf("].join('\\r\\n')", rpStart)
-const rpEnd = rpTail === -1 ? -1 : SRC.indexOf('}', rpTail)
-const relaunchPreludeSrc = rpEnd === -1 ? '' : SRC.slice(rpStart, rpEnd + 1)
+const rpStart = SRC_FW.indexOf('function relaunchPrelude(')
+const rpTail = rpStart === -1 ? -1 : SRC_FW.indexOf("].join('\\r\\n')", rpStart)
+const rpEnd = rpTail === -1 ? -1 : SRC_FW.indexOf('}', rpTail)
+const relaunchPreludeSrc = rpEnd === -1 ? '' : SRC_FW.slice(rpStart, rpEnd + 1)
 
 // 桩变量：路径故意带空格与 $，用来验证转义（PowerShell 双引号串里 $ 会被插值）
 const scope = {
@@ -108,6 +115,9 @@ const scope = {
   guardCount: 'C:\\Users\\花火\\.dsh\\plugin-console\\restart-guard-1234.count',
   killLine: 'Stop-Process -Id 1234 -Force -ErrorAction SilentlyContinue',
   prelude: '',
+  // Step 1（L0 分层）之后：包根统一走 lib/server/infra/paths.js 的 pluginRoot()
+  // （原来是 join(dirname(fileURLToPath(import.meta.url)), '..')，搬进子目录后会指错）
+  pluginRoot: () => 'D:\\dsh\\dsh-plugin-hub',
 }
 
 // 未知标识符用桩兜底（只为跑通生成、验证 PowerShell 语法；名字会打印出来供人工核对）
@@ -292,10 +302,10 @@ if (shell === null || makePrelude === null || realFwRoot === null || !existsSync
 /** 抽出形如 `const xxx = [ ...行... ]` 的数组字面量，返回可直接给 build() 求值的表达式。
  *  （重启路由的两个脚本数组用 writeFile 包着，没有 `.join('\r\n')` 结束标记，所以按下标扫描到 `]`。） */
 const extractArray = (startMarker) => {
-  const from = SRC.indexOf(startMarker)
+  const from = SRC_FR.indexOf(startMarker)
   if (from === -1) return ''
   const out = []
-  for (const line of SRC.slice(from).split('\n')) {
+  for (const line of SRC_FR.slice(from).split('\n')) {
     out.push(line)
     if (out.length > 1 && line.trim() === ']') break
   }
@@ -346,7 +356,7 @@ for (const [name, expr] of restartBlocks) {
   check('重启守护：连续失败有上限并放弃', guard.includes('-gt 5') && guard.includes('放弃并自删'))
   check('重启守护：自己也会拉起服务', guard.includes('Invoke-DshRelaunch'))
 }
-check('启动时会清理僵尸计划任务（含重启/守护任务）', SRC.includes('cleanupStaleFwTasks()') && /DSH-\(\?:FW-|RestartGuard/u.test(SRC))
+check('启动时会清理僵尸计划任务（含重启/守护任务）', [SRC, SRC_FR, SRC_RFU, SRC_FW].some((s) => s.includes('cleanupStaleFwTasks()')) && [SRC, SRC_FR, SRC_RFU, SRC_FW].some((s) => /DSH-\(\?:FW-|RestartGuard/u.test(s)))
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
 process.exit(failed === 0 ? 0 : 1)

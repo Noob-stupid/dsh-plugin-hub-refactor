@@ -52,7 +52,8 @@ const ctx = {
   effect: (fn) => { try { fn() } catch {}; return () => {} },
 }
 
-const { preflightDisableIncompatible, analyzeBootFailure } = await import('./lib/index.js')
+const { preflightDisableIncompatible } = await import('./lib/server/domain/framework.js')
+  const { analyzeBootFailure } = await import('./lib/server/domain/quarantine.js')
 const patchPath = join(profileDir, 'cordis.patch.yml')
 
 let failed = 0
@@ -61,7 +62,7 @@ const check = (label, cond, extra) => {
   if (!cond) failed += 1
 }
 
-const res = await preflightDisableIncompatible({ ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.1' })
+const res = await preflightDisableIncompatible({ ports: ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.1' })
 const patch = readFileSync(patchPath, 'utf8')
 
 check('不适配行被禁用', res.disabled.some((d) => d.rowId === 'bad-plugin'), JSON.stringify(res.disabled.map((d) => d.rowId)))
@@ -78,7 +79,7 @@ check('记录标记来源为前置门禁', rec?.source === 'preflight-disabled-b
 check('frameworkVersion 记为升级目标', pending.frameworkVersion === '0.1.5-rc.1', pending.frameworkVersion)
 
 // 幂等：再跑一次不应产生第二个禁用块
-await preflightDisableIncompatible({ ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.1' })
+await preflightDisableIncompatible({ ports: ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.1' })
 const patch2 = readFileSync(patchPath, 'utf8')
 check('幂等（禁用块不重复）', (patch2.match(/- id: bad-plugin/gu) ?? []).length === 1, `出现 ${(patch2.match(/- id: bad-plugin/gu) ?? []).length} 次`)
 
@@ -98,7 +99,7 @@ check('分析器保留命中行用于展示', analyzed.lines.length >= 3, `${ana
 check('分析器对正常日志返回空', analyzeBootFailure('all good\nno errors here').presets.length === 0 && analyzeBootFailure('all good').modules.length === 0)
 
 // ── 启动失败隔离决策器（planQuarantine）──────────────────────────────────────
-const { planQuarantine } = await import('./lib/index.js')
+const { planQuarantine } = await import('./lib/server/domain/quarantine.js')
 const candidates = [
   { rowId: 'bad-plugin', moduleName: '@fake/incompatible', toggleable: true, enabled: true },
   { rowId: 'webserver', moduleName: '@deepseek-ai/dsh-host-webserver', toggleable: false, enabled: true },

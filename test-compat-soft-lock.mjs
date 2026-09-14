@@ -61,6 +61,7 @@ const ctx = {
 }
 
 const mod = await import('./lib/index.js')
+const { preflightDisableIncompatible } = await import('./lib/server/domain/framework.js')
 mod.apply(ctx)
 const route = globalThis.__route
 if (!route) throw new Error('路由未注册')
@@ -165,13 +166,13 @@ check('重新打开自动检测', r.json?.compatGate?.autoDetect === true)
 // ── ⑥ 总开关：升级时自动禁用可关（只提示不动开关）──────────────────────────
 r = await call('POST', '/plugin-console/compat-gate', { autoDisable: false })
 check('关闭自动禁用返回新状态', r.status === 200 && r.json?.compatGate?.autoDisable === false, JSON.stringify(r.json?.compatGate))
-let pre = await mod.preflightDisableIncompatible({ ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.1' })
+let pre = await preflightDisableIncompatible({ ports: ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.1' })
 check('关闭后预扫不禁用任何行', pre.disabled.length === 0, JSON.stringify(pre.disabled))
 check('关闭后仍报告「判定不适配但被你关了」', pre.skipped.some((s) => s.rowId === 'incompat-row' && /自动禁用.*已关闭|已关闭/u.test(s.reason ?? '')), JSON.stringify(pre.skipped))
 check('关闭后补丁没有 incompat-row 禁用块', !/- id: incompat-row/u.test(readPatch()))
 r = await call('POST', '/plugin-console/compat-gate', { autoDisable: true })
 check('重新打开自动禁用', r.json?.compatGate?.autoDisable === true)
-pre = await mod.preflightDisableIncompatible({ ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.1' })
+pre = await preflightDisableIncompatible({ ports: ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.1' })
 check('打开后预扫真的禁用了不适配行', pre.disabled.some((d) => d.rowId === 'incompat-row'), JSON.stringify(pre.disabled.map((d) => d.rowId)))
 check('打开后补丁写入禁用块', /- id: incompat-row\r?\n {2}disabled: true/u.test(readPatch()))
 check('用户强行启用过的行不被预扫回收（enabled 的不再扫到）', !/- id: locked-row/u.test(readPatch()))

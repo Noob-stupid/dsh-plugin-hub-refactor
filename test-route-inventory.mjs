@@ -6,7 +6,7 @@
 //   · 路由清单必须与源码完全一致（新增/删除都要同步改这里）
 //   · 只读接口的 status 与顶层字段必须逐字段一致（改名即失败）
 //   · 环回 / Host / 同源写保护 / 405 方法门禁行为不变
-import { mkdirSync, writeFileSync, readFileSync, rmSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync, rmSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 
@@ -67,9 +67,14 @@ const ROUTES = [
   '/ai-empower/cancel', '/components', '/repo-clone', '/repo-list', '/repo-land-config', '/repo-remove',
   '/repo-open', '/component/autostart', '/component/start', '/component/stop', '/component/status', '/restart',
 ]
-const src = readFileSync(join(ROOT, 'lib', 'index.js'), 'utf8')
+// 分层后路由可能写在 lib/server/routes/**（表项）或 index.js（内联分支）—— 两种写法都要认
+const walkSrc = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((e) => {
+  const f = join(dir, e.name)
+  return e.isDirectory() ? walkSrc(f) : (e.name.endsWith('.js') ? [readFileSync(f, 'utf8')] : [])
+})
+const src = [readFileSync(join(ROOT, 'lib', 'index.js'), 'utf8'), ...walkSrc(join(ROOT, 'lib', 'server'))].join('\n')
 const found = new Set()
-for (const m of src.matchAll(/pathname === `\$\{ROUTE_PREFIX\}([^`]*)`/gu)) found.add(m[1])
+for (const m of src.matchAll(/path(?:name === |: )`\$\{ROUTE_PREFIX\}([^`]*)`/gu)) found.add(m[1])
 const missing = ROUTES.filter((p) => !found.has(p))
 const extra = [...found].filter((p) => !ROUTES.includes(p))
 check(`路由清单完整（${ROUTES.length} 条）`, missing.length === 0, missing.length === 0 ? '全部命中' : `缺失: ${missing.join(', ')}`)

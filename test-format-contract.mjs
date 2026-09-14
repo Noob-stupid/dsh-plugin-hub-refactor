@@ -7,7 +7,7 @@
 //   · ~/.dsh/plugin-console/ 下的文件名 —— 用户排障时会去看
 //   · 客户端 localStorage 键 —— 一改就丢用户设置
 // 拆分（L0-L3 分层）可以随便挪代码，但这些契约一个字都不能变。
-import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs'
+import { mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 
@@ -55,7 +55,17 @@ const check = (label, cond, extra) => {
   console.log(`${cond ? 'PASS' : 'FAIL'} ${label}${extra === undefined ? '' : ' — ' + extra}`)
   if (!cond) failed += 1
 }
-const indexSrc = readFileSync(join(ROOT, 'lib', 'index.js'), 'utf8')
+const serverSrc = (function walkServer(dir) {
+  let out = ''
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    const f = join(dir, e.name)
+    if (e.isDirectory()) out += walkServer(f)
+    else if (e.name.endsWith('.js')) out += readFileSync(f, 'utf8')
+  }
+  return out
+})(join(ROOT, 'lib', 'server'))
+// 分层后这些契约字符串分散在 index.js 与 lib/server/** 各模块里 —— 契约是"整个插件源码里仍然这么写"
+const indexSrc = readFileSync(join(ROOT, 'lib', 'index.js'), 'utf8') + serverSrc
 const clientSrc = readFileSync(join(ROOT, 'lib', 'client.js'), 'utf8')
 
 // ── ① cordis.patch.yml 禁用块格式（升级/回滚/隔离脚本都在写它）────────────────

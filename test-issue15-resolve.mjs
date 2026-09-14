@@ -1,26 +1,12 @@
 // 场景模拟（issue #15）：npm 全局安装 dsh 时 ctx.baseUrl 落在框架安装树，
 // resolvePackageJson(moduleName, frameworkBase, profileDir) 必须回退解出第三方包。
+// Step 1 重构后：该函数已搬进 lib/server/infra/paths.js —— 直接 import 真模块。
 import fs from 'node:fs'
-import vm from 'node:vm'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const ROOT = path.dirname(fileURLToPath(import.meta.url))
-const src = fs.readFileSync(path.join(ROOT, 'lib', 'index.js'), 'utf8')
-const start = src.indexOf('/** 包名归一')
-const end = src.indexOf('/** 已加载插件的包元信息缓存')
-if (start < 0 || end < 0) { console.error('markers not found'); process.exit(1) }
-const sandbox = {
-  console, String, JSON, Math,
-  createRequire: (await import('node:module')).createRequire,
-  existsSync: fs.existsSync,
-  join: path.join,
-  dirname: path.dirname,
-  fileURLToPath,
-}
-vm.createContext(sandbox)
-vm.runInContext(src.slice(start, end), sandbox)
-const { resolvePackageJson } = sandbox
+const { resolvePackageJson } = await import('./lib/server/infra/paths.js')
 
 const os = await import('node:os')
 // 模拟全局 dsh 树：优先环境变量，其次本机 npx 缓存常见位置（CI 无此环境则跳过）

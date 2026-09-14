@@ -51,14 +51,14 @@ const ctx = {
   effect: (fn) => { try { fn() } catch {}; return () => {} },
 }
 
-const { preflightDisableIncompatible } = await import('./lib/index.js')
+const { preflightDisableIncompatible } = await import('./lib/server/domain/framework.js')
 let failed = 0
 const check = (label, cond, extra) => {
   console.log(`${cond ? 'PASS' : 'FAIL'} ${label}${extra === undefined ? '' : ' — ' + extra}`)
   if (!cond) failed += 1
 }
 
-const res = await preflightDisableIncompatible({ ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.2' })
+const res = await preflightDisableIncompatible({ ports: ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.2' })
 const patch = readFileSync(patchPath, 'utf8')
 const ids = res.disabled.map((d) => d.rowId)
 
@@ -76,7 +76,7 @@ check('只有真不适配的行进清单', pend.includes('true-ref') && !pend.in
 check('清单判定依据仍是源码扫描 fail', (pending.pending ?? []).find((p) => p.rowId === 'true-ref')?.check === 'fail')
 
 // 幂等：再跑一次不应重复写块
-await preflightDisableIncompatible({ ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.2' })
+await preflightDisableIncompatible({ ports: ctx, profileDir, patchPath, targetVersion: '0.1.5-rc.2' })
 const patch2 = readFileSync(patchPath, 'utf8')
 check('幂等（true-ref 禁用块仍只有 1 个）', (patch2.match(/- id: true-ref/gu) ?? []).length === 1)
 
