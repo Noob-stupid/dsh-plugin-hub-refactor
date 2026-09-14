@@ -1,11 +1,13 @@
 > **English**: [README.md](README.md) | **中文**: [README.zh.md](README.zh.md)
 
-> **📢 npm 版本顺延到 9 月 15 日发布**
+> ## ⚗️ 这是「分层重构预览线」的**独立仓库**（实验性）
 >
-> npm 上 `@noob-stupid/dsh-plugin-console` 目前仍是 **0.3.33**；**最新版（v0.3.46）将于 2026-09-15 发布到 npm**。
-> 这几天想用新版，直接从本仓库 / [v0.3.46 Release](https://github.com/Noob-stupid/dsh-plugin-hub/releases/tag/v0.3.46) 取源码：
-> 把 `lib/` 与 `package.json` 放进 `~/.dsh/profiles/<profile>/node_modules/@noob-stupid/dsh-plugin-console/` 后重启 DSH 即可（内容与 npm 包一致）。
-> 9/15 之后在控制台点「检测更新 → 更新并适配」，或 `dsh plugin add @noob-stupid/dsh-plugin-console`。
+> - **稳定版不在这里** → [`Noob-stupid/dsh-plugin-hub`](https://github.com/Noob-stupid/dsh-plugin-hub)（`main` = 单体版）· npm [`@noob-stupid/dsh-plugin-console@0.3.46`](https://www.npmjs.com/package/@noob-stupid/dsh-plugin-console)
+> - **本仓库是什么**：把 `lib/index.js`（7637 行）拆成分层结构的**实验版** —— `lib/index.js` **142 行** + `lib/server/**` **36 个模块**（7 infra + 18 domain + 11 routes + state.js），**功能零变化**，只为可维护性
+> - **与稳定版的等价性**：逐条对打 47 条路由，`status` + 响应字段 **47/47 一致**；17 套测试（含 46 条路由契约与 8 条架构守卫断言）全绿
+> - **⚠️ 请勿用于生产**：真框架升级/回滚、重启守护链路、真装真卸、组件进程启停、AI 真跑、Gitee OAuth 回调**尚未实测**（长尾风险估计 10%~25%）
+> - **抽包计划**：方案里的三个包（`dsh-plugin-manager` / `dsh-upgrade-guard` / `dsh-deploy-planner`）**以后会在这个仓库里抽**，现在不做 —— 详见 [`REFACTOR-PREVIEW.zh.md`](REFACTOR-PREVIEW.zh.md)
+> - 本仓库 `package.json` 已标 `"private": true`，**不会**误发 npm 覆盖稳定版
 
 ---
 

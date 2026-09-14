@@ -1,10 +1,10 @@
 {
   "name": "@noob-stupid/dsh-plugin-console",
   "version": "0.4.0-beta.1",
-  "description": "DSH plugin management panel & marketplace: one-click enable/disable, multi-source market (GitHub/Gitee/custom), static-index market (500+ plugins / 300 skills), skills, suites, and one-click framework upgrade.",
+  "description": "分层重构预览版（实验性，勿用于生产）— dsh-plugin-hub 的实验分支线",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Noob-stupid/dsh-plugin-hub"
+    "url": "git+https://github.com/Noob-stupid/dsh-plugin-hub-refactor.git"
   },
   "type": "module",
   "main": "./lib/index.js",
@@ -40,5 +40,6 @@
   "scripts": {
     "checkBom": "node -e \"const fs=require('fs');const b=fs.readFileSync('package.json');if(b[0]===0xEF){console.error('BOM detected in package.json — strip it before publish');process.exit(1)};console.log('package.json BOM check OK')\"",
     "prepublishOnly": "npm run checkBom"
-  }
+  },
+  "private": true
 }

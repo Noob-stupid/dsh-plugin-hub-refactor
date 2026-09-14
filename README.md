@@ -1,11 +1,13 @@
 > **English**: [README.md](README.md) | **中文**: [README.zh.md](README.zh.md)
 
-> **📢 npm release delayed to Sep 15, 2026**
+> ## ⚗️ Standalone preview repo: layered refactor (experimental)
 >
-> npm still serves **0.3.33** of `@noob-stupid/dsh-plugin-console`; **the latest (v0.3.46) will be published on 2026-09-15**.
-> Until then, get it straight from this repo / the [v0.3.46 release](https://github.com/Noob-stupid/dsh-plugin-hub/releases/tag/v0.3.46):
-> copy `lib/` and `package.json` into `~/.dsh/profiles/<profile>/node_modules/@noob-stupid/dsh-plugin-console/` and restart DSH (identical to the npm package).
-> After Sep 15: 「检测更新 → 更新并适配」 in the console, or `dsh plugin add @noob-stupid/dsh-plugin-console`.
+> - **Stable version lives elsewhere** → [`Noob-stupid/dsh-plugin-hub`](https://github.com/Noob-stupid/dsh-plugin-hub) (`main` = monolith) · npm [`@noob-stupid/dsh-plugin-console@0.3.46`](https://www.npmjs.com/package/@noob-stupid/dsh-plugin-console)
+> - **What this repo is**: the experimental layering of `lib/index.js` (7637 lines) — **142 lines** + `lib/server/**` **36 modules**; **zero behaviour change**, maintainability only
+> - **Equivalence evidence**: 47 routes compared one by one — `status` + response fields **47/47 identical**; 17 test suites green (incl. 46 route contracts + 8 architecture-guard assertions)
+> - **⚠️ Not for production**: real framework upgrade/rollback, restart guardian, real install/uninstall, component start/stop, real AI run and Gitee OAuth have **not been exercised yet** (~10–25% long-tail risk)
+> - **Package extraction (Stage 2)** — `dsh-plugin-manager` / `dsh-upgrade-guard` / `dsh-deploy-planner` — will happen **in this repo later**, not now: see [`REFACTOR-PREVIEW.zh.md`](REFACTOR-PREVIEW.zh.md)
+> - `package.json` is marked `"private": true` so the preview can never overwrite the stable npm package
 
 ---
 

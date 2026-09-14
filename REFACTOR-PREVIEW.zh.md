@@ -7,11 +7,11 @@
 | 项 | 说明 |
 |---|---|
 | 工作仓库 | `dsh-hub-Exp`（**私有**，用户看不到；重构的所有提交都在这里） |
-| 对外指针 | **hub 仓库的 `refactor-preview` 分支**（公开可读）<br>`https://github.com/Noob-stupid/dsh-plugin-hub/tree/refactor-preview` |
+| 对外指针 | **独立公开仓库**：[`Noob-stupid/dsh-plugin-hub-refactor`](https://github.com/Noob-stupid/dsh-plugin-hub-refactor)（本仓库，默认分支 `main`） |
 | 对外发布 | GitHub **Pre-release `v0.4.0-beta.1`**（标注实验性，指向该分支） |
 | 稳定线 | hub `main` = 单体版 **0.3.46**（npm `latest`，用户日常用这个） |
 
-**为什么用分支而不是另开一个公开仓库**：用户只需"一个可读、可克隆、可 diff 的指针"；分支天然与 `main` 同源（历史可比对、回退只需换分支），而另开仓库要处理 README/LICENSE/CI/索引重复。若将来确实想要独立仓库，可从该分支一键迁移（无历史包袱）。
+**为什么单独开一个仓库**（用户 2026-09-14 决定）：① 预览线与稳定线的入口彻底分开，用户不会误装；② hub 仓库的 Releases/分支/tag 只保留稳定版，不再出现"单体 + 重构"两条线混在一起；③ 本仓库 `package.json` 标了 `"private": true`，物理上不可能误发 npm 覆盖稳定版；④ 将来的抽包（Stage 2）直接在这里做，天然是独立的包工作区。
 
 ## 二、预览版包含什么
 
