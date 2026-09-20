@@ -179,6 +179,17 @@ check('★ 汇总里带上 git 自己的话（stderr），而不是只有 Comman
     stderr: 'fatal: unable to access \'u\': The requested URL returned error: 502\n',
   }]).includes('git 说：') === true)
 
+// 2026-09-20 本机实测：%TEMP% 下 rmSync 会**静默落空**（不抛错、目录仍在）。此时再换下一个源
+// 只会多出一条"目录非空"，把第一个源的真实错误一起搅浑 —— 所以 gitCloneRepo 改为清不掉就 break，
+// 并且必须在文案里说清"目录清不掉、多源重试无效、请手动删除"。
+const uncleanMsg = summarizeCloneErrors([
+  { url: 'https://ghproxy.net/https://github.com/o/r.git', message: 'Command failed: git clone u d' },
+  { url: 'https://github.com/o/r.git', message: '克隆目标目录无法清理（环境禁止删除）：C:/t/x', unclean: true },
+])
+check('★ 清理失败时明确说「目录清不掉、多源重试无效」并给出人工处理办法',
+  uncleanMsg.includes('（目标目录清不掉，未重试）') && uncleanMsg.includes('多源重试因此无效')
+  && uncleanMsg.includes('请手动删除该目录后重试'), uncleanMsg)
+
 // ── ⑨ 删除必须核实：rmSync 在本机某些环境下会「静默落空」（不抛错、目录仍在） ──────────
 // 演练实测（2026-09-20）：同一个 rmSync 在 D:\dsh\repos 删得掉，在 C:\Users\<user>\.dsh\… 下
 // 返回成功但目录原封不动；旧代码删完直接 {ok:true} → 对用户撒谎（技能删不掉、残留清理假装清干净）。
