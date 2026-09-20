@@ -46,6 +46,11 @@ const stripCode = (src) => {
       }
       continue
     }
+    // 展开运算符 `...x`：x 的前一个字符也是 '.'，会被自由变量扫描的 (?<![\w$.]) 当成属性访问而漏掉。
+    // 真实事故（2026-09-19）：`sendJson(res, 200, { ok: true, ...installJobView(job) })` 漏了 import
+    // → 守卫全绿、而 live 的 /install-status 恒 500。用等长空格替换（保持行/列偏移不变），
+    // 让展开位置的标识符重新对断言 ⑦/⑧ 可见。
+    if (c === '.' && n === '.' && src[i + 2] === '.') { out += '   '; i += 3; continue }
     out += c
     i += 1
   }

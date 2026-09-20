@@ -102,6 +102,37 @@ for (const [method, path, body, wantStatus, wantKeys] of SCHEMAS) {
   check(`响应契约 ${method} ${path.replace('/plugin-console', '')}`, same, `status=${r.status} keys=${keys.join(',')}`)
 }
 
+// ── ②b /install-status 命中真实任务必须 200（防 installJobView 漏 import 复发）─────
+// 事故（2026-09-19，live 实测）：routes/install.js 用了 installJobView(job) 却没有 import
+// → ReferenceError → /install-status 恒 500（轮询 90 次全 500，安装进度卡刷不出来），
+// 而上面的契约表只测了 jobId 为空的 404 早返回分支，命不中出错那一行 → 测试与守卫双双漏过。
+{
+  const { installJobs } = await import('./lib/server/state.js')
+  installJobs.set('job-inventory-1', {
+    id: 'job-inventory-1', repo: 'owner/demo', source: 'github', packageName: null, status: 'installing',
+    stage: 'preparing', error: null, startedAt: 1, finishedAt: null, entryId: null, bundle: false, ai: false,
+    aiNote: null, subpackages: null, lastError: null, update: false, kind: 'plugin',
+  })
+  const r = await call('POST', '/plugin-console/install-status', { jobId: 'job-inventory-1' })
+  check('install-status 命中真实任务 → 200（不是 500）',
+    r.status === 200 && r.json?.ok === true && r.json?.jobId === 'job-inventory-1' && r.json?.status === 'installing',
+    `status=${r.status} body=${JSON.stringify(r.json)?.slice(0, 140)}`)
+  const view = r.json ?? {}
+  check('install-status 视图字段完整（kind/curlNote/suiteNote）',
+    view.kind === 'plugin' && view.stage === 'preparing' && 'suiteNote' in view && 'curlNote' in view,
+    `kind=${view.kind} stage=${view.stage} keys=${Object.keys(view).length}`)
+  installJobs.delete('job-inventory-1')
+  // 同一类漏 import（守卫补洞后新发现）：routes/ai.js 用了 aiJobView 却没有 import
+  // → /ai-empower/status 命中真实任务时必然 500；老契约表同样只测了 jobId 为空的 404 分支。
+  const { aiJobs } = await import('./lib/server/domain/ai.js')
+  aiJobs.set('ai-inventory-1', { id: 'ai-inventory-1', source: 'local', status: 'running', stage: 'planning', error: null })
+  const a = await call('POST', '/plugin-console/ai-empower/status', { jobId: 'ai-inventory-1' })
+  check('ai-empower/status 命中真实任务 → 200（不是 500）',
+    a.status === 200 && a.json?.ok === true && a.json?.jobId === 'ai-inventory-1' && a.json?.status === 'running',
+    `status=${a.status} body=${JSON.stringify(a.json)?.slice(0, 140)}`)
+  aiJobs.delete('ai-inventory-1')
+}
+
 // ── ③ 安全中间件：环回 / Host / 同源写保护 / 方法门禁 ─────────────────────────
 {
   const r = fakeRes()
