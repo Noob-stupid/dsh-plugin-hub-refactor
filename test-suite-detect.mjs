@@ -22,6 +22,7 @@ import {
 import { gitBin, resolvePnpmRunners } from './lib/server/infra/exec.js'
 import { DEFAULT_SOURCES } from './lib/server/domain/sources.js'
 import { hasDirectNameHit, packageProbeErrorText, parseRepoFromUrl } from './lib/server/domain/market.js'
+import { summarizeCloneErrors } from './lib/server/domain/repoland.js'
 import { resolveInstallKind } from './lib/server/domain/suite.js'
 
 let failed = 0
@@ -153,6 +154,20 @@ check('hasDirectNameHit：名字逐词命中 → 不再重查', hasDirectNameHit
 check('★ hasDirectNameHit：web-all 在结果里没有名字命中 → 触发 in:readme 重查',
   hasDirectNameHit([{ fullName: 'bradeGithub/DSH-Plugins-Marketplace' }, { fullName: 'Amakurai/dsh-liketavern' }], 'web-all') === false)
 check('hasDirectNameHit：查询词太短（<3 字符）不做二次查询', hasDirectNameHit([], 'we') === true)
+
+// ── ⑧ 克隆重试：报「首个错误」，不被次生的"目录非空"掩盖 ────────────────────────
+// 事故（2026-09-20，另一位用户截图）：`git clone 失败：… fatal: destination path '…' already exists
+// and is not an empty directory.` —— 第一次（ghproxy 镜像）失败留下半成品目录，第二次立刻以
+// "目录非空"失败，旧代码把这条当 lastError 抛出去 → 真实原因（镜像/网络不可达）被完全掩盖。
+const cloneMsg = summarizeCloneErrors([
+  { url: 'https://ghproxy.net/https://github.com/o/r.git', message: 'fatal: unable to access: Failed to connect' },
+  { url: 'https://github.com/o/r.git', message: "fatal: destination path 'C:/t/x' already exists and is not an empty directory." },
+])
+check('★ 克隆失败报「首个错误」（真实原因）而不是次生错误',
+  cloneMsg.includes('首个错误') && cloneMsg.includes('Failed to connect'), cloneMsg.slice(0, 80))
+check('克隆失败列出尝试过的源，并把"目录非空"那条标出来',
+  cloneMsg.includes('已尝试 2 个源') && cloneMsg.includes('（目录非空）'))
+check('单源失败也能正常汇总', summarizeCloneErrors([{ url: 'a', b: 1, message: 'boom' }]).includes('boom'))
 
 server.close()
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
