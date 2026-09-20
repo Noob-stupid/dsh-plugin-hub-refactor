@@ -2,6 +2,24 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.5 — CI 增加「真装真卸」冒烟（Linux 宿主上真跑，含反向对照）（2026-09-20）
+
+> 本仓库是**实验性预览线**（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.50**。
+
+复盘：环境相关测试"没有 profile 就整体 SKIP"，于是 `git.exe`、corepack 的 Windows 路径假设、
+以及多通道兜底路径在 CI 的 Linux 宿主上从未执行 → 直到真实用户撞出来。本次只补验证，不改产品行为。
+
+- 新增 `test-install-smoke.mjs`（CI 独立步骤，不带 `DSH_TEST_SKIP_NETWORK`）：临时 `DSH_HOME` 内
+  ① `git --version`（`gitBin()` 平台正确性）② `resolvePnpmRunners()` 首选方式与本平台匹配
+  ③ **真装** `left-pad`（npmjs → npmmirror）④ 校验落盘 + **真卸载** + 校验移除
+  ⑤ `gitCloneRepo` **真克隆**一个小仓库；
+- 反向对照（PATH 打断）：测试**响亮失败**并给出 `spawnSync git.exe ENOENT` 与克隆的「首个错误」清单 ——
+  证明它不是静默跳过；
+- 预览线测试套件 **18 → 19 套**（含架构守卫）。
+
+> ⚠️ 实验性预览版：真框架升级/回滚、重启守护链路、组件进程启停、AI 真跑、Gitee OAuth 回调尚未实测。
+> **请勿用于生产**。
+
 ## v0.4.0-beta.4 — 同 hub 0.3.49：搜索可搜「npm 包名 / README / 仓库文件里的名字」+ 克隆失败不再掩盖真实原因（2026-09-20）
 
 > 本仓库是**实验性预览线**（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.49**。
