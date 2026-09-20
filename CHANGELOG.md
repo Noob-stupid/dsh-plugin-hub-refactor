@@ -2,6 +2,45 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.3 — 同 hub 0.3.48 的三类环境相关修复 + 预览线独有：补回 3 处漏 import、守卫补展开运算符盲点（2026-09-20）
+
+> 本仓库是**实验性预览线**（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.48**。
+> 触发：两位用户实测反馈——① 装 `MeteorNOX/DeepSeek-Balance-Whale-Widget`（标准 bundle 插件）
+> 报「未找到 .gitmodules（不是 submodule 套装仓库）」；② Android + proot Ubuntu 容器里 GitHub 仓库
+> 直装恒定失败报「仓库没有 package.json」，「仓库落地」报 `spawn git.exe ENOENT`，AI 赋能报
+> `Cannot find module '.../corepack/dist/corepack.js'`。
+
+**与 hub 0.3.48 同源的三类修复**
+
+1. **套装判定改「内容校验」**：旧逻辑只看 `.gitmodules` 探测是否非 null（**空 body 也算"文件存在"**），
+   代理/CDN 的假 2xx 会把普通插件判成 submodule 套装置仓库 → clone 后必报「未找到 .gitmodules」。
+   新增 `readBodyOrNull` / `looksLikeGitmodules`，`/enrich`、`/repo`、安装兜底全部改用内容校验；
+   移除失效镜像 `mirror.ghproxy.com`。
+2. **套装通道兜底**：clone 后确实没有 `.gitmodules` 时不再直接失败，改为**自动回落普通插件安装**
+   （npm → Release → git 规格）并在 `job.suiteNote` 说明。
+3. **抓取超时 ≠ 文件不存在**：`rawTextFetch()` 返回 `{ state, body }`（ok / not-found / unreachable），
+   竞速语义抽成纯函数 `raceFetchOutcome()`；预算 raw 5s → **10s**、默认分支探测 3s → **8s**、
+   curl 6s → 9s，GitHub 域名 curl 加 **`-4`**；超时文案与 404 文案彻底分开（`job.probeReason`）。
+4. **跨平台**：「仓库落地」的 `git.exe` → `gitBin()`；AI 赋能 install-npm 的 corepack 路径假设 →
+   `resolvePnpmRunners()` + `runPnpmWithFallback()`，`pnpmInstall` / `pnpmRemove` / install-npm 统一走它。
+
+**预览线独有（分层重构自身的问题，稳定版没有）**
+
+- **`/install-status` 恒 500**：`routes/install.js` 用了 `installJobView(job)` 却**漏了 import**
+  （`/ai-empower/status` 的 `aiJobView`、git 兜底通道的 `gitCloneUrls` 同样漏）——live 实测轮询
+  90 次全 500，安装进度卡刷不出来，而安装本身照常完成。
+- **架构守卫的自由变量检查有展开运算符盲点**：`...foo` 里的 `foo` 前一个字符也是 `.`，
+  被 `(?<![\w$.])` 当成属性访问跳过 → 这类漏 import 对守卫完全隐形。`stripCode` 改为把 `...`
+  替换成等长空格（保持行列偏移）后，守卫**立刻多抓出 2 条**同类漏 import。
+- **路由契约测试补洞**：原来只测 `/install-status`、`/ai-empower/status` 的 jobId 为空 404 早返回分支，
+  命不中出错那一行；新增「命中真实任务 → 200 + 视图字段完整」断言。
+- 套件 **17 → 18 套**（新增 `test-suite-detect.mjs`：空 body/垃圾页不算套装、四种竞速结局、
+  超时与 404 文案必须不同、git/corepack 跨平台定位，全部离线确定性可跑）。
+
+**live 验收（重启后实测）**：`/repo` → `hasPackageJson=true`、`hasSuite=false`；
+`/install` → `kind=plugin`（旧代码是 `suite`）；`/install-status` → **200** + 完整视图（旧代码恒 500）；
+任务 `status=done`，命中「已检测到本地已安装 dsh-whale-widget@0.3.7，跳过重复下载」。
+
 ## v0.4.0-beta.2 — 同上修复（分层重构预览线）（2026-09-14）
 
 > 用户实测：全家桶卡片点「一键启用已适配」后只有个别行被启用，其余仍停在【补丁停用】。
