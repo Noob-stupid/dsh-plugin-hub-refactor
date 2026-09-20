@@ -14,10 +14,12 @@
 //   ② .gitmodules 必须内容像 gitmodules（含 [submodule "x"] 段）才算套装（looksLikeGitmodules）
 //   ③ 安装类型决策以内容为准，前端标记/缓存误判不能把普通插件送进套装通道（resolveInstallKind）
 import { createServer } from 'node:http'
+import { join } from 'node:path'
 import {
   FETCH_BUDGET_MS, FETCH_NOT_FOUND, FETCH_OK, FETCH_UNREACHABLE, META_BUDGET_MS,
   curlText, looksLikeGitmodules, raceFetchOutcome, readBodyOrNull,
 } from './lib/server/infra/http.js'
+import { gitBin, resolvePnpmRunners } from './lib/server/infra/exec.js'
 import { packageProbeErrorText } from './lib/server/domain/market.js'
 import { resolveInstallKind } from './lib/server/domain/suite.js'
 
@@ -101,6 +103,29 @@ check('★ 超时文案与「没有 package.json」文案必须不同', timeoutT
 check('超时文案点明超时/网络，并给出重试 + 仓库落地两条出路',
   /超时|网络/u.test(timeoutText) && timeoutText.includes('重试') && timeoutText.includes('仓库落地'), timeoutText.slice(0, 60))
 check('404 文案保持原文案（含"没有 package.json"）', missingText.includes('没有 package.json'))
+
+// ── ⑥ 跨平台：git 可执行名 与 pnpm/corepack 定位 ──────────────────────────────
+// 另一位用户（Android + proot Ubuntu）同一批截图里还有两个非 Windows 环境必炸的硬编码：
+//   · 「仓库落地」克隆：`spawn git.exe ENOENT`（Linux 上根本没有 git.exe）
+//   · AI 赋能 install-npm：`Cannot find module '/usr/local/bin/node_modules/corepack/dist/corepack.js'`
+check('git 可执行名跨平台（Linux 不能是 git.exe）', gitBin() === (process.platform === 'win32' ? 'git.exe' : 'git'), gitBin())
+const linuxGlobalCorepack = join('/usr/local/bin', '..', 'lib', 'node_modules', 'corepack', 'dist', 'corepack.js')
+const linuxNoCorepack = resolvePnpmRunners({ platform: 'linux', execPath: '/usr/local/bin/node', exists: () => false })
+check('Linux 找不到 corepack.js 时兜底 corepack → pnpm（不再生成 MODULE_NOT_FOUND 命令）',
+  linuxNoCorepack.map((r) => r.kind).join(',') === 'corepack,pnpm',
+  linuxNoCorepack.map((r) => r.note).join(' → '))
+const linuxGlobal = resolvePnpmRunners({ platform: 'linux', execPath: '/usr/local/bin/node', exists: (p) => p === linuxGlobalCorepack })
+check('★ 能认出 Linux npm 全局布局（<prefix>/lib/node_modules/corepack）',
+  linuxGlobal[0]?.kind === 'node-corepack' && linuxGlobal[0].run(['add', 'x']).argv[0] === linuxGlobalCorepack,
+  linuxGlobal[0]?.note)
+const winNoCorepack = resolvePnpmRunners({ platform: 'win32', execPath: 'C:\\Program Files\\nodejs\\node.exe', comspec: 'C:\\Windows\\System32\\cmd.exe', exists: () => false })
+check('Windows 找不到 corepack.js 时经 cmd /c 调用（execFile 不能直接跑 .cmd）',
+  winNoCorepack[0]?.kind === 'cmd-corepack' && winNoCorepack[0].run(['add', 'x']).bin.endsWith('cmd.exe'),
+  winNoCorepack[0]?.note)
+const winWithCorepack = resolvePnpmRunners({ platform: 'win32', execPath: 'C:\\Program Files\\nodejs\\node.exe', exists: (p) => p === join('C:\\Program Files\\nodejs', 'node_modules', 'corepack', 'dist', 'corepack.js') })
+check('Windows 官方安装器布局优先（node 直跑 corepack.js）',
+  winWithCorepack[0]?.kind === 'node-corepack' && winWithCorepack[0].run(['add', 'x']).bin === 'C:\\Program Files\\nodejs\\node.exe',
+  winWithCorepack[0]?.note)
 
 server.close()
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
