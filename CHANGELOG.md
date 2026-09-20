@@ -2,6 +2,30 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.9 — 同 hub 0.3.54：删除核实 / 装完未重启也能撤 / 失败清场 / 聚合与套装进度（2026-09-20）
+
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.54**。
+
+这一批与 hub 0.3.54 功能等价，全部来自**真装真卸演练**（拿本机没有的插件真装真卸）。分层版落地位置：
+
+- **删除核实**：L0 `infra/fsx.js` 新增 `removeDirVerified()`（删后 `existsSync` 核实 + 重试，失败如实报错）；
+  `/skill-remove`、`/clean-residuals`、`/repo-remove`、克隆重试前清理、装包前清旧目录全部改用。
+- **克隆失败说人话**：`domain/repoland.js` 的 `gitErrorDetail()` 把 git stderr 末两行带进汇总；
+  半成品清不掉时 `gitCloneRepo` 停止重试并说明"多源重试无效、请手动删除"。
+- **装完未重启也能撤**：新增 L1 `domain/revoke.js`（`revokePendingInstall` / `pendingRestartJobs`）；
+  `/uninstall` 接受 `{jobId}`；`GET /state` 新增 `pendingRestart`；前端显示「已安装·重启后生效」徽标，
+  删除按钮直接撤销（补丁行 / bundles / 包目录三处回读核实）。
+- **失败清场**：`domain/install-job.js` 新增 `cleanupAttemptedCandidates()`，AI 兜底取消/超时失败时清掉
+  本次落盘的包目录与 pnpm `_tmp_` 半成品，并把「已清理 / 未能清理（路径）」写进错误文案。
+- **进度与授权**：`installJobView()` 暴露 `progress{channel,phase,index,total,name,done}` 与
+  `aiConsent{pending,since,timeoutMs,lastError}`；聚合安装显示「正在装第 i/n 个子包」，套装显示
+  「clone / 装配 第 i/n 个」，需要授权本地 AI 兜底时进度位置出现**带倒计时的授权卡**（同意 / 取消）。
+- **`@scope/all` 认作聚合包**（判据补 `/\/all$/`）；**私有根报错不再借用他人包名**。
+
+**验证**：19 个测试文件全绿（含架构守卫：`lib/index.js` ≤142 行、单模块 ≤600 行、domain 不吃 ctx）；
+真跑演练：聚合仓库（`CAPTAIN1275/dsh-ui-web`，进度 1/8→2/11→11/11→ai-consent，取消→无残留、同意→进入
+repairing，全程零模型费用）与套装通道（本地真 git 远端，clone 1/2→2/2→assemble 1/2→2/2 done）。
+
 ## v0.4.0-beta.8 — 同 hub 0.3.53：外观回退为一颗 pill + GitHub 设备码登录（Token 兜底）（2026-09-20）
 
 > 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.53**。
