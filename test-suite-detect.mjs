@@ -14,7 +14,7 @@
 //   ② .gitmodules 必须内容像 gitmodules（含 [submodule "x"] 段）才算套装（looksLikeGitmodules）
 //   ③ 安装类型决策以内容为准，前端标记/缓存误判不能把普通插件送进套装通道（resolveInstallKind）
 import { createServer } from 'node:http'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import {
   FETCH_BUDGET_MS, FETCH_NOT_FOUND, FETCH_OK, FETCH_UNREACHABLE, META_BUDGET_MS,
   curlText, looksLikeGitmodules, raceFetchOutcome, readBodyOrNull,
@@ -122,9 +122,13 @@ const winNoCorepack = resolvePnpmRunners({ platform: 'win32', execPath: 'C:\\Pro
 check('Windows 找不到 corepack.js 时经 cmd /c 调用（execFile 不能直接跑 .cmd）',
   winNoCorepack[0]?.kind === 'cmd-corepack' && winNoCorepack[0].run(['add', 'x']).bin.endsWith('cmd.exe'),
   winNoCorepack[0]?.note)
-const winWithCorepack = resolvePnpmRunners({ platform: 'win32', execPath: 'C:\\Program Files\\nodejs\\node.exe', exists: (p) => p === join('C:\\Program Files\\nodejs', 'node_modules', 'corepack', 'dist', 'corepack.js') })
+// 注意：断言必须与生产代码用同一套 dirname/join 语义构造期望值——
+// 曾经把 Windows 路径字面量写进断言，在 Linux CI 上 dirname 不认反斜杠 → 断言假失败（CI 抓到）
+const winNode = join('C:', 'Program Files', 'nodejs', 'node.exe')
+const winCorepack = join(dirname(winNode), 'node_modules', 'corepack', 'dist', 'corepack.js')
+const winWithCorepack = resolvePnpmRunners({ platform: 'win32', execPath: winNode, exists: (p) => p === winCorepack })
 check('Windows 官方安装器布局优先（node 直跑 corepack.js）',
-  winWithCorepack[0]?.kind === 'node-corepack' && winWithCorepack[0].run(['add', 'x']).bin === 'C:\\Program Files\\nodejs\\node.exe',
+  winWithCorepack[0]?.kind === 'node-corepack' && winWithCorepack[0].run(['add', 'x']).bin === winNode,
   winWithCorepack[0]?.note)
 
 server.close()
