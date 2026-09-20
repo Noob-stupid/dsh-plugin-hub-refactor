@@ -22,6 +22,7 @@ import {
   curlText, looksLikeGitmodules, raceFetchOutcome, readBodyOrNull,
 } from './lib/server/infra/http.js'
 import { gitBin, resolvePnpmRunners } from './lib/server/infra/exec.js'
+import { cleanupAttemptedCandidates } from './lib/server/domain/install-job.js'
 import { removeDirVerified } from './lib/server/infra/fsx.js'
 import { DEFAULT_SOURCES } from './lib/server/domain/sources.js'
 import { hasDirectNameHit, packageProbeErrorText, parseRepoFromUrl } from './lib/server/domain/market.js'
@@ -202,6 +203,23 @@ check('★ 清理失败时明确说「目录清不掉、多源重试无效」并
     okResult.ok === true && existsSync(probe) === false, JSON.stringify(okResult))
   check('removeDirVerified：目标本来就不存在也算成功（幂等）',
     removeDirVerified(probe).ok === true)
+}
+
+// ── ⑩ 安装失败必须清场并如实汇报 ────────────────────────────────────────────────
+// 真装演练（2026-09-20）：11 个子包的聚合仓库跑 19 分钟后失败，node_modules 里留着
+// `@captain1275/dsh-full-stats_tmp_56272_2` 这类 pnpm 半成品和一个真包，面板只报"安装失败"。
+{
+  const fakeProfile = join(dirname(fileURLToPath(import.meta.url)), '.testdir', 'fake-profile')
+  const pkgDir = join(fakeProfile, 'node_modules', '@drill', 'pkg-a')
+  const tmpDir = join(fakeProfile, 'node_modules', '@drill', 'pkg-a_tmp_123_1')
+  mkdirSync(pkgDir, { recursive: true })
+  mkdirSync(tmpDir, { recursive: true })
+  writeFileSync(join(pkgDir, 'package.json'), '{"name":"@drill/pkg-a"}', 'utf8')
+  const res = cleanupAttemptedCandidates(fakeProfile, ['@drill/pkg-a', '@drill/never-installed'])
+  check('★ 失败清场：包目录与 pnpm `_tmp_` 半成品都被清掉',
+    existsSync(pkgDir) === false && existsSync(tmpDir) === false, JSON.stringify(res))
+  check('失败清场：只汇报真正清过的包（没装过的候选不算）',
+    res.cleaned.includes('@drill/pkg-a') && res.failed.length === 0, JSON.stringify(res))
 }
 
 server.close()
