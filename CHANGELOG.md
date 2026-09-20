@@ -2,6 +2,19 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.6 — 索引源全挂时 65.7s → 16.7s（2026-09-20）
+
+> 本仓库是**实验性预览线**（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.51**。
+
+- `market-index` 的逐个拉取改为**每源单次 curl**（`curlJson`，8s 硬超时）+ 整体预算 12s
+  （原来用 `fetchJsonUrl`：curl 一次 + node:https 兜底默认 20s → 单源最坏 ~28s）。
+  真实网络实测"5 个索引源全挂"这条路径：**65.7s → 16.7s**。
+- 同步记录一条**既有行为**：默认索引源扩容到 5 个只对"没有 sources 配置文件"的实例生效——
+  live 实测 `/sources` 仍返回旧的 2 个源（用户自己的 `~/.dsh/plugin-console-sources.json` 优先）。
+
+> ⚠️ 实验性预览版：真框架升级/回滚、重启守护链路、组件进程启停、AI 真跑、Gitee OAuth 回调尚未实测。
+> **请勿用于生产**。
+
 ## v0.4.0-beta.5 — CI 增加「真装真卸」冒烟（Linux 宿主上真跑，含反向对照）（2026-09-20）
 
 > 本仓库是**实验性预览线**（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.50**。

@@ -2,7 +2,7 @@
 
 > ## ⚗️ Standalone preview repo: layered refactor (experimental)
 >
-> - **Stable version lives elsewhere** → [`Noob-stupid/dsh-plugin-hub`](https://github.com/Noob-stupid/dsh-plugin-hub) (`main` = monolith) · npm [`@noob-stupid/dsh-plugin-console@0.3.50`](https://www.npmjs.com/package/@noob-stupid/dsh-plugin-console)
+> - **Stable version lives elsewhere** → [`Noob-stupid/dsh-plugin-hub`](https://github.com/Noob-stupid/dsh-plugin-hub) (`main` = monolith) · npm [`@noob-stupid/dsh-plugin-console@0.3.51`](https://www.npmjs.com/package/@noob-stupid/dsh-plugin-console)
 > - **What this repo is**: the experimental layering of `lib/index.js` (7637 lines) — **142 lines** + `lib/server/**` **36 modules**; **zero behaviour change**, maintainability only
 > - **Equivalence evidence**: 47 routes compared one by one — `status` + response fields **47/47 identical**; 18 test suites green (incl. 46 route contracts + 8 architecture-guard assertions)
 > - **⚠️ Not for production**: real framework upgrade/rollback, restart guardian, real install/uninstall, component start/stop, real AI run and Gitee OAuth have **not been exercised yet** (~10–25% long-tail risk)
