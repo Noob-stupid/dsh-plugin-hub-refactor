@@ -20,7 +20,8 @@ import {
   curlText, looksLikeGitmodules, raceFetchOutcome, readBodyOrNull,
 } from './lib/server/infra/http.js'
 import { gitBin, resolvePnpmRunners } from './lib/server/infra/exec.js'
-import { packageProbeErrorText } from './lib/server/domain/market.js'
+import { DEFAULT_SOURCES } from './lib/server/domain/sources.js'
+import { hasDirectNameHit, packageProbeErrorText, parseRepoFromUrl } from './lib/server/domain/market.js'
 import { resolveInstallKind } from './lib/server/domain/suite.js'
 
 let failed = 0
@@ -130,6 +131,28 @@ const winWithCorepack = resolvePnpmRunners({ platform: 'win32', execPath: winNod
 check('Windows 官方安装器布局优先（node 直跑 corepack.js）',
   winWithCorepack[0]?.kind === 'node-corepack' && winWithCorepack[0].run(['add', 'x']).bin === winNode,
   winWithCorepack[0]?.note)
+
+// ── ⑦ 搜索可达性：只存在于「npm 包名 / README / 仓库文件」里的名字 ────────────────
+// 事故（2026-09-20，另一位用户）：搜 `web-all` 搜不到 `zhu1090093659/dsh-web`（★7800 全家桶）。
+// 实测：`web-all` 既不在该仓库的名字/描述/topics 里（仓库名是 dsh-web），GitHub 仓库搜索 32 条不含它；
+// 它是 npm 包 `@linxin666/dsh-web-all`，代码在 packages/dsh-web-all/package.json（代码搜索需登录）。
+check('索引源默认 ≥ 4 个（只有 2 个源时同时挂掉＝市场退化成只能搜 GitHub 实时结果）',
+  DEFAULT_SOURCES.indexSources.length >= 4, `共 ${DEFAULT_SOURCES.indexSources.length} 个`)
+check('索引源 URL 全是 https 且指向 marketplace/index.json',
+  DEFAULT_SOURCES.indexSources.every((s) => /^https:\/\/\S+$/u.test(s.url) && s.url.includes('marketplace/index.json')))
+check('索引源有且只有一个主源', DEFAULT_SOURCES.indexSources.filter((s) => s.primary === true).length === 1)
+
+check('parseRepoFromUrl：https / git+https / .git 后缀',
+  parseRepoFromUrl('https://github.com/zhu1090093659/dsh-web.git') === 'zhu1090093659/dsh-web'
+  && parseRepoFromUrl('git+https://github.com/Noob-stupid/dsh-plugin-hub.git') === 'Noob-stupid/dsh-plugin-hub')
+check('parseRepoFromUrl：npm 老式简写 github:o/r', parseRepoFromUrl('github:zhu1090093659/dsh-web') === 'zhu1090093659/dsh-web')
+check('parseRepoFromUrl：带 monorepo 子路径锚点', parseRepoFromUrl('https://github.com/o/r#packages/x/package.json') === 'o/r')
+check('parseRepoFromUrl：非 GitHub/Gitee → null', parseRepoFromUrl('https://gitlab.com/o/r.git') === null && parseRepoFromUrl('') === null)
+
+check('hasDirectNameHit：名字逐词命中 → 不再重查', hasDirectNameHit([{ fullName: 'zhu1090093659/dsh-web' }], 'dsh-web') === true)
+check('★ hasDirectNameHit：web-all 在结果里没有名字命中 → 触发 in:readme 重查',
+  hasDirectNameHit([{ fullName: 'bradeGithub/DSH-Plugins-Marketplace' }, { fullName: 'Amakurai/dsh-liketavern' }], 'web-all') === false)
+check('hasDirectNameHit：查询词太短（<3 字符）不做二次查询', hasDirectNameHit([], 'we') === true)
 
 server.close()
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
