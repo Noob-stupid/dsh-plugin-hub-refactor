@@ -2,6 +2,33 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.4 — 同 hub 0.3.49：搜索可搜「npm 包名 / README / 仓库文件里的名字」+ 克隆失败不再掩盖真实原因（2026-09-20）
+
+> 本仓库是**实验性预览线**（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.49**。
+
+**一、搜索可达性**（另一位用户搜 `web-all` 搜不到 `zhu1090093659/dsh-web` 全家桶）
+
+- 根因链条：`web-all` 是 **npm 包名** `@linxin666/dsh-web-all`，而那个仓库**名字是 `dsh-web`**
+  （名字/描述/topics 里都没有它）→ GitHub 仓库搜索无解（实测三种查法都不含它，只有
+  `dsh-web-all in:readme` 命中）；控制台本来能搜到它的**代码搜索**通道**要求登录**（未登录实测 401）；
+  那位用户索引又加载失败 → 三条检索路全断。
+- 新增：**npm 包名反查**（registry → 包 → `repository.url` → 仓库，命中置顶并可按包名安装）、
+  **in:readme 重查**（不需登录）、**索引源 2 → 5**（jsDelivr cdn/gcore/fastly + ghproxy + raw，
+  单源 8s / 循环 20s 预算）、**`extras` 增量检索通道**（浏览器直连成功时并行补齐）、
+  索引失败时的**后果说明 + 重试按钮**、未登录提示、`addLocal` 支持 `npmPackage`。
+
+**二、克隆重试不再掩盖真实原因**
+
+`gitCloneRepo` 多源重试（ghproxy 镜像 → GitHub 直连）不清理目标目录：第一次失败留下半成品目录后，
+第二次立刻以 `destination path … already exists and is not an empty directory` 失败，旧代码抛**最后一条**
+错误 → 真实原因被掩盖。现在每次尝试前清理目标目录，失败时抛**首个错误** + 尝试清单（标出"目录非空"那条）。
+
+**验收（新代码 + 临时 DSH_HOME）**：17 套测试全绿 · 全功能路由冒烟 **24 项全过**
+（state/sources/skills-installed/components/market-index/search×3/repo/subpackages/repo-list/compat-gate/
+framework-check/framework-upgrade-status/ai-empower/list/details + 4 条破坏性操作拦截 + 2 条安全门禁）；
+端到端 `q=web-all` 首位 = `zhu1090093659/dsh-web`（★7812、`@linxin666/dsh-web-all@0.3.23`、默认分支 dev）；
+三个**真套装**仓库对照仍正确判为套装（内容校验没修过头）。
+
 ## v0.4.0-beta.3 — 同 hub 0.3.48 的三类环境相关修复 + 预览线独有：补回 3 处漏 import、守卫补展开运算符盲点（2026-09-20）
 
 > 本仓库是**实验性预览线**（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.48**。
