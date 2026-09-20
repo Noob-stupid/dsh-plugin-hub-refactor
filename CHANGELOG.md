@@ -2,6 +2,15 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.8 — 同 hub 0.3.53：外观回退为一颗 pill + GitHub 设备码登录（Token 兜底）（2026-09-20）
+
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.53**。
+
+- 市场页恢复一颗 pill（登录态 + 搜索源菜单），登录入口收进菜单（移除上一批的独立登录徽章）。
+- 新增 `POST /github-open-login`：代理调 `dsh-github-login` 的 `/github-auth/open`（Device Flow：在 GitHub
+  官方页面输账号密码/验证码）+ 透传 `/github-auth/status`；客户端 2s × 60s 轮询 `/state` 直到已登录。
+  通道不可用时回 200 + `started:false` + reason，前端自动回退 Token 粘贴（`POST /github-login` 保留）。
+- 路由 47 → 48。实测：本机宿主上该插件的路由当前不可达（404/405），因此会走兜底通道。
 ## v0.4.0-beta.7 — 同 hub 0.3.52：子包「读不到 ≠ 不存在」+ GitHub Token 登录（2026-09-20）
 
 > 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.52**。
