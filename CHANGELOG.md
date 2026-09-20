@@ -2,6 +2,16 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.7 — 同 hub 0.3.52：子包「读不到 ≠ 不存在」+ GitHub Token 登录（2026-09-20）
+
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.52**。
+
+- 子包列表读空时：自动换分支重试一次（main ↔ dev），仍为空则明确说「本次没能读到（多为网络受限，
+  **不代表没有子包**）」并给出可复制命令；记 `job.probeReason`。
+- 新增 `POST /github-login`（`lib/server/routes/github-login.js`）：形状校验 → 用该 token 自身校验并取 login
+  → 写 `<DSH_HOME>/github-auth.json`；响应/日志不回显 token，失败不落盘；校验通道不与 gh keyring 竞速
+  （避免无效 token 顶掉真实登录）。
+- 客户端：「未登录 GitHub」徽章可点，展开面板粘贴 token 登录（中英 i18n 各 5 条）；路由 46 → 47。
 ## v0.4.0-beta.6 — 索引源全挂时 65.7s → 16.7s（2026-09-20）
 
 > 本仓库是**实验性预览线**（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.51**。
