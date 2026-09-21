@@ -2,6 +2,17 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.11 — 同 hub 0.3.57：所有安装通道都对账 lockfile（2026-09-21）
+
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.57**。
+
+- `domain/selfupdate.js` 的 `reconcileLockfile()` 改为**多包**（一次 `pnpm add` 传数组 spec）：全部一致直接返回；
+  有漂移则一次对齐；仍对不上 → `lockNote` 逐包列出 + 可复制命令。
+- `domain/install-job.js`：安装成功后对账 `[主包, ...聚合子包]`（移到子包版本对齐/完整性检查之后）；
+  `runSuiteInstallJob` 返回后对账 `job.suiteInstalled`（`domain/suite.js` 装配普通插件时记名）。
+- `installJobView` 暴露 `lockUpdated/lockVersion/lockNote`；客户端安装成功提示追加 ⚠️ `lockNote`。
+- 测试：`test-route-inventory.mjs` 新增 4 条断言；19/19 全绿（含架构守卫）。
+
 ## v0.4.0-beta.10 — 同 hub 0.3.56：自更新改为包管理器优先，升级写进 lockfile（2026-09-20）
 
 > 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.56**。

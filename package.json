@@ -1,6 +1,6 @@
 {
   "name": "@noob-stupid/dsh-plugin-console",
-  "version": "0.4.0-beta.10",
+  "version": "0.4.0-beta.11",
   "description": "分层重构预览版（实验性，勿用于生产）— dsh-plugin-hub 的实验分支线",
   "repository": {
     "type": "git",
