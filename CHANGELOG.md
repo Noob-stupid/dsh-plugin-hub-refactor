@@ -2,10 +2,10 @@
 
 All notable changes to dsh-plugin-hub.
 
-## v0.4.0-beta.10 — 同 hub 0.3.55：自更新改为包管理器优先，升级写进 lockfile（2026-09-20）
+## v0.4.0-beta.10 — 同 hub 0.3.56：自更新改为包管理器优先，升级写进 lockfile（2026-09-20）
 
-> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.55**。
-> 同 hub 0.3.55：来自用户实测报告——一键更新只铺文件、不写 `pnpm-lock.yaml`，之后任何 pnpm 操作都可能
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.56**。
+> 同 hub 0.3.56（0.3.55 被 npm 暂存发布占用，见 hub CHANGELOG）：来自用户实测报告——一键更新只铺文件、不写 `pnpm-lock.yaml`，之后任何 pnpm 操作都可能
 > 把它还原成 lock 里的旧版本。分层版落地位置：
 
 - 新增 L1 `domain/selfupdate.js`（150 行）：`isRegistryRange` / `profileSpec` / `readInstalledVersion` /
