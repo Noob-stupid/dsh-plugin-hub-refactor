@@ -2,6 +2,23 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.10 — 同 hub 0.3.55：自更新改为包管理器优先，升级写进 lockfile（2026-09-20）
+
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.55**。
+> 同 hub 0.3.55：来自用户实测报告——一键更新只铺文件、不写 `pnpm-lock.yaml`，之后任何 pnpm 操作都可能
+> 把它还原成 lock 里的旧版本。分层版落地位置：
+
+- 新增 L1 `domain/selfupdate.js`（150 行）：`isRegistryRange` / `profileSpec` / `readInstalledVersion` /
+  `lockVersion`（从 lock 的 importers 段读被钉住的版本，且不被同前缀包误导）/ `selfUpdateToLatest`
+  （① `pnpm update` → ② `pnpm add <pkg>@<版本>` → ③ 回读核实 → 手铺兜底必带警告）。
+- `/self-update` 响应新增可核实字段 `method`/`spec`/`installedVersion`/`lockVersion`/`lockUpdated`/`lockNote`/`command`/`errors`。
+- 前端：`lockUpdated === false` 时显著提示"未写入 lockfile、会被 pnpm 还原"并给出可复制命令。
+- 测试：`test-route-inventory.mjs` 新增 8 条断言（spec 判定、lock 解析防误命中、pnpm-update 路径、
+  update 无效转 pnpm-add、兜底必须 lockUpdated=false）。19/19 全绿（含架构守卫；导出名与 `routes/framework.js`
+  的局部变量重名时改名为 `readInstalledVersion`）。
+- 真跑：产品自己的 `selfUpdateToLatest()` 把 fixture 控制台 0.3.53 → 0.3.54（真 pnpm），`lockUpdated=true`，
+  再触发重装与 `pnpm install --force` 仍保持 0.3.54；本地未能复现"被还原"那一步（如实记录）。
+
 ## v0.4.0-beta.9 — 同 hub 0.3.54：删除核实 / 装完未重启也能撤 / 失败清场 / 聚合与套装进度（2026-09-20）
 
 > 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.54**。
