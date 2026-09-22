@@ -2,6 +2,14 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.12 — 同 hub 0.3.58：安装通道不再连坐 + 子包发现弃用目录白名单（2026-09-21）
+
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.58**。
+
+- `domain/install-job.js`：`repoChannelAllowed` 取代 `!subpackageMode` 连坐守卫（curl/并行竞速对子包开放；
+  release/git 仅对「被请求的那个包」开放）；`domain/market.js`：子包发现白名单 → 任意深度 ≤2 的 `package.json`。
+- 19/19 测试全绿（含架构守卫）。
+
 ## v0.4.0-beta.11 — 同 hub 0.3.57：所有安装通道都对账 lockfile（2026-09-21）
 
 > 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.57**。

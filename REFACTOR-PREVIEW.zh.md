@@ -8,8 +8,8 @@
 |---|---|
 | 工作仓库 | `dsh-hub-Exp`（**私有**，用户看不到；重构的所有提交都在这里） |
 | 对外指针 | **独立公开仓库**：[`Noob-stupid/dsh-plugin-hub-refactor`](https://github.com/Noob-stupid/dsh-plugin-hub-refactor)（本仓库，默认分支 `main`） |
-| 对外发布 | GitHub **Pre-release `v0.4.0-beta.11`**（标注实验性，指向该分支） |
-| 稳定线 | hub `main` = 单体版 **0.3.57**（npm `latest`，用户日常用这个） |
+| 对外发布 | GitHub **Pre-release `v0.4.0-beta.12`**（标注实验性，指向该分支） |
+| 稳定线 | hub `main` = 单体版 **0.3.58**（npm `latest`，用户日常用这个） |
 
 **为什么单独开一个仓库**（用户 2026-09-14 决定）：① 预览线与稳定线的入口彻底分开，用户不会误装；② hub 仓库的 Releases/分支/tag 只保留稳定版，不再出现"单体 + 重构"两条线混在一起；③ 本仓库 `package.json` 标了 `"private": true`，物理上不可能误发 npm 覆盖稳定版；④ 将来的抽包（Stage 2）直接在这里做，天然是独立的包工作区。
 
