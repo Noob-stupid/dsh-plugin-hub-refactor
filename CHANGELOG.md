@@ -2,6 +2,56 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.16 — 修「安装后依赖规格被改写成不存在的 npm 版本」（缺陷②，潜伏性数据一致性缺陷）（2026-09-22）
+
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.63**。
+> 本版 = 0.4.0-beta.15（注入缝 `ctx.get`）+ 缺陷②修复，与稳定线 0.3.63 同源同修。
+
+### 缺陷②：release 来源的依赖被写成裸版本号
+
+**现象（用户 issue 草案「缺陷②」，附实测）**：release 通道（从 GitHub release 的 tarball 装、npm registry 上
+并不存在的包）装完后，`<profile>/package.json` 里该依赖 specifier 被改写成**裸版本号**
+（例 `"@dsh-external/dsh-super-injector": "0.3.3"`），而该包 `npm view` 是 **404**。现在能跑只因
+`pnpm-lock.yaml` 里还留着 tarball URL 的解析；**一旦 lock 被重建**（删 lock、清 `node_modules`、换机、CI）
+→ `ERR_PNPM_FETCH_404`，而报错指向 npm registry，用户根本联想不到是几周前面板安装改写造成的。
+
+**根因（明确结论：0.3.57 引入的回归）**：写回者不是 release 通道（`githubReleaseInstall()` 只解压落盘、
+从不碰 manifest），而是 0.3.57 新增的 lock 对账 `reconcileLockfile()`（首次引入提交 `962c7e5`，
+`git describe --contains` = `v0.3.57~1`）—— 它对每个漂移包执行 `pnpm add <name>@<installed>`；
+对 registry 上不存在的包，pnpm 见「已装版本满足新 spec」就**静默**改写成裸版本号
+（真 pnpm 10.34.5 实测输出 `Already up to date`、**EXIT=0**，面板据此报 `lockUpdated=true`）。
+
+**修法**：
+- 写回前**先探 registry**（新增 `lib/server/domain/dep-source.js` 的 `probeRegistryPackage()`，
+  多镜像 + 超时兜底）：这个包的**这个版本**可解析才写 `<name>@<版本>`（不误伤正常 registry 来源包）；
+- 查无此包（404）→ **绝不写裸版本号**：物化到 `<DSH_HOME>/plugin-src/<包名>`，specifier 写 **`link:<绝对路径>`**；
+- 为什么不用 issue 的方案 A（tarball URL）：实测 pnpm 10 对 direct-URL 依赖只在冷缓存真下载时记 `integrity`，
+  命中缓存重写 lock 时 `resolution` 里没有 integrity → `ERR_PNPM_MISSING_TARBALL_INTEGRITY`，
+  且 pnpm 会把 lock 文件**直接删掉**，形成死循环。`link:` 不经 registry 解析、不经完整性校验，
+  8 个场景实测全通过（删 lock / 删 lock+node_modules / `--frozen-lockfile` / 加装别的包 / 重复对账…）；
+- **护栏**：非 registry 来源（`link:` / `git+` / `file:` / URL）一律不降级成版本号；已污染状态
+  （裸版本号 spec + lock 解析到 URL）自动自愈为 `link:`；物化失败则**跳过对齐且不碰 package.json**；
+- **顺带修 `lockVersion()`**：解析 importers 段时遇 `specifier:` 行就 `break`，导致它从未读到 `version:`
+  （一直靠 packages 段兜底），而兜底正则在 `name@https://…` 处截断成 `http`、link 依赖读不到
+  → 来源钉住的包被判「永久漂移」，每次安装白跑一次 `pnpm add` 并给一条假的「没写进 lock」警告；
+- **用户可见 note**：走 `link:` 时安装结果带明确说明（`job.depNote` → `installJobView` → 面板展示），
+  例如「该包只存在于 GitHub release，已按 link: 形式记录依赖 —— 不经 npm registry 解析、不经 tarball
+  完整性校验，pnpm 重建 lock 也能装上」。
+
+**实测对照**（真 pnpm 10.34.5 + 真 corepack，`D:\` 临时 profile）：
+
+| 步骤 | 修前 | 修后 |
+|---|---|---|
+| lock 对账后 specifier | `0.3.3`（裸版本号，pnpm EXIT=0） | `link:<DSH_HOME>/plugin-src/@dsh-external/dsh-super-injector` |
+| 删 lock + node_modules 重装 | ❌ `ERR_PNPM_FETCH_404` | ✅ 成功（`--frozen-lockfile` 亦通过） |
+
+- 另外修掉本次改动自己会引入的一个隐患：`"pkg": "latest"` 这类 **dist-tag 规格**必须保留标签，写成 `<name>@latest`；绝不能把裸 `latest` 丢给 `pnpm add`（那会去装一个名叫 `latest` 的包）。
+- 又补一条**链接有效性**护栏：`link:` 依赖若被 release/curl 通道的"先 rmSync 再 copyTree"换成真实目录，lock 里仍是 `link:`、版本号看不出差异 —— 下一次 pnpm 操作会按 lock 重建链接，把刚更新上去的版本**还原**成 `plugin-src` 里的旧副本（与 0.3.56 修过的自更新缺陷同族）。现在对账会检测"链接是否真的还指向目标"，不成立就重新物化（把新副本刷进 `plugin-src`）再重放 `link:`（实测能把链接与版本一起恢复）。
+- 19/19 测试全绿，其中 `test-route-inventory.mjs` 新增 17 条缺陷②断言（registry 404 桩 → 写回 `link:`、
+  registry 可解析 → 仍写版本号、git 来源不被改写、已污染自愈、link 已对齐不白跑 pnpm）。
+- 架构守卫：新增模块后 `lib/server/**` 单文件 ≤600 行棘轮仍全绿（新增 3 个导出放在 `dep-source.js`，
+  未挤爆 `install.js`）。
+
 ## v0.4.0-beta.15 — 注入缝改用 `ctx.get`（方案 A）+ 假 ctx 换严格替身（2026-09-22）
 
 > 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.62**。
