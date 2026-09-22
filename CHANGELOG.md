@@ -2,6 +2,11 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.14 — 同 hub 0.3.60（注入缝兜底）
+
+- 同步：注入缝读取加 try/catch 兜底（预览线本来就是纯对象，此处只是防御性对齐）。
+- 19/19 测试全绿。
+
 ## v0.4.0-beta.13 — 同 hub 0.3.59：release 按包名反查 + 修 TDZ 回归与竞速永不结算（2026-09-22）
 
 > 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.59**。
