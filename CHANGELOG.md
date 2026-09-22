@@ -2,6 +2,17 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.13 — 同 hub 0.3.59：release 按包名反查 + 修 TDZ 回归与竞速永不结算（2026-09-22）
+
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.59**。
+
+- 新增 L1 `domain/release-source.js`（504 行）：按包名反查发布仓库 + 遍历 ≤10 条 release 的全部 assets 按包名匹配；
+  硬预算（总 20s / 3 个候选仓库 / 不翻页）；下载「直连优先 + 镜像兜底」（70s 封顶）。
+- `domain/install.js`：`raceInstallChannels` 补第三个出口（两条都 settle 即收工）+ 清理兜底定时器（修「永不结算」）。
+- `domain/install-job.js`：修 `repoChannelAllowed` 的 TDZ 回归；守卫收尾（curl/竞速去 `!expanded`、release 去
+  `repoChannelAllowed`+`!expanded`、git 保持 root-only）。
+- 测试：19/19 全绿（总 28.3 秒）；`test-suite-install.mjs` 8 分钟+ → 6.3 秒。
+
 ## v0.4.0-beta.12 — 同 hub 0.3.58：安装通道不再连坐 + 子包发现弃用目录白名单（2026-09-21）
 
 > 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.58**。
