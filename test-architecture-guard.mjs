@@ -1,6 +1,6 @@
 // Step 1 机制化护栏（防退化）：分层拆分如果没强制边界，半年后又会变回 7000 行单文件。
 //
-// 八道断言：
+// 九道断言：
 //   ① 行数棘轮 —— lib/index.js 只能变小（每完成一步就把上限往下调）；lib/server/** 单文件 ≤ 600 行
 //   ② 依赖方向 —— infra 不得 import domain/routes/index（只能向下依赖）；不得出现循环 import
 //   ③ 包根唯一 —— 只有 lib/server/infra/paths.js 可以用 import.meta.url 算包根，且 pluginRoot() 必须指向包根
@@ -9,6 +9,8 @@
 //   ⑥ 接线完整 —— 相对 import 目标存在、不自引用、导入名在目标文件里确有导出
 //   ⑦ 无自由变量 —— 模块里引用的插件命名空间标识符必须有本地声明或 import（node --check 抓不到）
 //   ⑧ 导入绑定只读 —— 没有文件给别的模块导出的绑定赋值（node --check 也抓不到）
+//   ⑨ 宿主访问白名单 —— ctx/ports 的属性式访问只能是 inject 声明过的名字或 cordis 核心成员
+//      （2026-09-22 事故：`ports?.installChannels` 属性式读取未声明的名字 → 真实 ctx 同步抛，安装全灭）
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs'
 import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -298,6 +300,44 @@ for (const p of [...serverFiles, join(ROOT, 'lib', 'index.js')]) {
   }
 }
 check('没有文件给别的模块导出的绑定赋值（导入绑定只读）', mutatedImports.length === 0, [...new Set(mutatedImports)].slice(0, 6).join(', ') || undefined)
+
+// ── ⑨ ctx/ports 属性式访问的白名单（2026-09-22 事故的**静态**防线）────────────────
+// 事故：为单测留的注入缝写成 `ports?.installChannels` —— 属性式读取一个没写进 inject 的名字。
+// 真实 cordis 的 ctx 代理会**同步抛** `cannot get property "installChannels" without inject`
+// （0.3.59 每一次安装都失败），而单测喂的手写普通对象不会拒绝任何属性 → 全绿。
+// 动态防线在 test-suite-detect.mjs ⑯ / test-suite-install.mjs（strict-ctx.mjs 严格替身 + 账本）；
+// 这条静态防线覆盖全树：lib/** 里出现 `ctx.X` / `ports.X` 时，X 只能是
+//   ① 插件 `inject` 声明过的服务名（真实 ctx 上属性访问合法）
+//   ② cordis ctx 自身成员（baseUrl 是 Context 的 own property；effect/get 等在原型上）
+//   ③ 极少数"只在普通对象上走"的已知例外（见 EXEMPT，逐条写清理由）
+// 新的可选读取一律用 `ctx.get('名字')` 或显式传参 —— 绝不要靠往 inject 里加名字绕过（除非它真是服务）。
+const injectDecl = [...(indexSrc.match(/export const inject = \[([^\]]*)\]/u)?.[1] ?? '').matchAll(/'([^']+)'/gu)].map((m) => m[1])
+const CTX_MEMBER_ALLOW = new Set([
+  ...injectDecl,
+  // cordis Context 的 own/prototype 成员（属性访问不需要 inject，不会抛）
+  'baseUrl', 'effect', 'get', 'set', 'provide', 'accessor', 'isolate', 'extend', 'inject',
+  'on', 'once', 'off', 'emit', 'parallel', 'waterfall', 'bail', 'serial', 'start', 'stop',
+  'root', 'fiber', 'scope', 'name', 'config', 'logger', 'reflect', 'registry', 'events',
+])
+// 已知例外：channelImpls 的**普通对象回退**分支 —— 它只在 `typeof ports?.get !== 'function'` 时执行，
+// 也就是"根本不可能是 cordis ctx"的老式窄接口/测试替身；cordis ctx 一定先走 ctx.get 主路径。
+// 这条例外本身由 test-suite-detect.mjs ⑯ 的动态断言兜住（改回属性访问 → 注入桩取不到 → 红）。
+const CTX_PROPERTY_EXEMPT = new Set(['installChannels'])
+const hostAccessIssues = []
+for (const p of [...serverFiles, join(ROOT, 'lib', 'index.js')]) {
+  const rel = p.replace(ROOT, '').replace(/\\/gu, '/')
+  const lines = stripCode(readFileSync(p, 'utf8')).split('\n')
+  for (let i = 0; i < lines.length; i += 1) {
+    for (const m of lines[i].matchAll(/(?<![\w$.])(?:ctx|ports)(\??)\.([A-Za-z_$][\w$]*)/gu)) {
+      const prop = m[2]
+      if (CTX_MEMBER_ALLOW.has(prop) || CTX_PROPERTY_EXEMPT.has(prop)) continue
+      hostAccessIssues.push(`${rel}:${i + 1} ${m[0]}`)
+    }
+  }
+}
+check(`ctx/ports 的属性式访问都在白名单内（inject: ${injectDecl.join('/')} + cordis 核心成员 + ${CTX_PROPERTY_EXEMPT.size} 条已知例外）`,
+  hostAccessIssues.length === 0,
+  hostAccessIssues.length === 0 ? undefined : `${[...new Set(hostAccessIssues)].join(', ')} —— 可选读取请改用 ctx.get('名字') 或显式传参`)
 
 console.log(failed === 0 ? '\nALL PASS' : `\n${failed} FAILED`)
 process.exit(failed === 0 ? 0 : 1)

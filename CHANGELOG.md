@@ -2,6 +2,26 @@
 
 All notable changes to dsh-plugin-hub.
 
+## v0.4.0-beta.15 — 注入缝改用 `ctx.get`（方案 A）+ 假 ctx 换严格替身（2026-09-22）
+
+> 实验性预览线（`private: true`，不发 npm）；稳定版请用 hub 的 **0.3.62**。
+
+- **① 注入缝语义修正（issue 草案方案 A）**：`channelImpls(ports)` 改为**优先 `ctx.get('installChannels')`** ——
+  Cordis 的正规可选读取，未声明也不抛，与同文件 `ports.get('subagents')` / `ports.get('agents')` /
+  `ctx.get('skills')` 等 5 处既有写法一致；普通对象（测试替身/窄接口）才回退属性访问，try/catch 兜底保留。
+  属性式读取未 inject 的名字在真实 cordis ctx 上会**同步抛** `cannot get property "installChannels" without inject`，
+  0.3.59 每一次安装都在这里失败。草案第一条建议（把"同文件其它 5 处都写对了"列为佐证）正是选 A 的依据：
+  这不是风格问题，是新加的这处偏离了既有约定。
+- **② 测试替身现在会校验未声明属性（真正杜绝同类回归）**：新增 `strict-ctx.mjs` —— 复刻 cordis 语义的严格替身：
+  `inject` 声明过的名字可属性访问；只 provide、未 inject 的名字**只能 `ctx.get` 读**，属性访问抛
+  `cannot get property "X" without inject` **并记入账本**（即使异常被 try/catch 吞掉也留痕）。
+  `test-suite-detect.mjs` 新增 ⑯ 节、`test-suite-install.mjs` 全程换用它，并断言"整条安装路径账本为空"。
+  实测演示：把注入缝改回属性访问 → 两条用例立刻红（`race=false` + 账本记下 `installChannels`）。
+  草案第二条建议（把"单测为什么没拦住"写进去）落实为这条防线：根因是**替身与真实运行时语义不一致**。
+- **静态防线**：`test-architecture-guard.mjs` 新增第 ⑨ 条断言 —— lib/** 里 `ctx.X` / `ports.X` 只允许
+  inject 声明的名字、cordis 核心成员与 1 条写明理由的例外（普通对象回退分支）。
+- 19/19 测试全绿（逐文件单独跑）。
+
 ## v0.4.0-beta.14 — 同 hub 0.3.60（注入缝兜底）
 
 - 同步：注入缝读取加 try/catch 兜底（预览线本来就是纯对象，此处只是防御性对齐）。
